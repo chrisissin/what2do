@@ -1,0 +1,188 @@
+<?php
+
+$accesstoken = $_GET['accesstoken'];
+//"AAAHB8L7JGeIBAGw4MyC2VyQdLly3hWeSuxqkkMjOdEjTtITx46WCnvooEvbdAOunloqUw1cgTD6ZC1sePdSQA10r6bgYZD";
+$myfbid = $_GET['fbid'];
+//"574924679";
+
+
+$data = getHttp("https://graph.facebook.com/".$myfbid."/?fields=id,name,friends,email,gender,education,address,location,locale,work,birthday,hometown&access_token=".$accesstoken);
+
+//sql//
+quertmysql("INSERT INTO `what2do`.`person` (`fbid`, `data`, `id`, `ts`) VALUES ('".$myfbid."', '".$data."', NULL, CURRENT_TIMESTAMP);");
+
+//create table//
+$qry =
+"CREATE TABLE IF NOT EXISTS `fb".$myfbid."` (
+  `id` bigint(20) NOT NULL,
+  `name` varchar(255) CHARACTER SET utf8 DEFAULT NULL,
+  `data` text CHARACTER SET utf8 NOT NULL,
+  `lon` float NOT NULL,
+  `lat` float NOT NULL,
+  `time` datetime DEFAULT NULL,
+  `timestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `placer` bigint(20) DEFAULT NULL,
+  `placeid` bigint(20) DEFAULT NULL,
+  `whosfriend` bigint(20) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;";
+quertmysql($qry);
+
+//file//
+$myFile = "/tmp/".$myfbid."-info.json";
+$mydata = json_decode($data);
+writeobj2file($mydata, $myFile );
+
+foreach($mydata->friends->data as $valu)
+{ 
+	$fbid = $valu->id;
+	$wht = "photos";
+	$myFile = "/tmp/".$fbid."-".$wht.".json";
+	$obb = getFriendCheckins($fbid, $accesstoken,$wht);
+	//file//	
+	writeobj2file($obb, $myFile);
+	//sql//
+	writetodb($obb,$fbid,$myfbid);
+	
+	$wht = "checkins";
+	$myFile = "/tmp/".$fbid."-".$wht.".json";
+	$obb = getFriendCheckins($fbid, $accesstoken,$wht);
+	//file//	
+	writeobj2file($obb, $myFile);
+	//sql//
+	writetodb($obb,$fbid,$myfbid);
+}
+
+//sql//
+/*
+foreach($mydata->friends->data as $valu)
+{ 
+	$fbid = $valu->id;
+	$myFile = "/tmp/".$fbid."-checkins.json";
+	$fh = fopen($myFile, 'r') or die("can't open file");
+	$data = fread($fh,filesize($myFile));
+	$listobj = json_decode($data);
+	writetodb($listobj,$fbid,$whosfriend);
+
+    $myFile = "/tmp/".$fbid."-photos.json";
+    $fh = fopen($myFile, 'r') or die("can't open file");
+    $data = fread($fh,filesize($myFile));
+    $listobj = json_decode($data);
+    writetodb($listobj,$fbid,$whosfriend);
+}
+*/
+
+function writetodb($dadada,$fbid,$whosfriend)
+{
+$username="root";
+$password="what2do";
+$database="what2do";
+
+foreach($dadada->data as $adada)
+{
+	if(isset($adada->place)){
+	$ctime = $adada->created_time;
+	$lon = $adada->place->location->longitude;
+	$lat = $adada->place->location->latitude;
+	$name  ='';
+	$name = @$adada->place->name;
+	$placeid = $adada->place->id;
+ 	mysql_connect("localhost",$username,$password);
+	@mysql_select_db($database) or die( "Unable to select database");
+	$rdata = json_encode($adada);
+	$query = 
+"INSERT INTO `what2do`.`fb".$whosfriend."` (`id`, `name`, `time`, `lon`, `lat`, 
+`data` ,
+ `placer`, `placeid`, `whosfriend`) VALUES ('$adada->id', '$name', '$ctime', '$lon', '$lat', 
+'$rdata',
+'$fbid','$placeid','$whosfriend')";
+error_log($query);
+	mysql_query("SET NAMES utf8");
+	mysql_query($query);
+
+	mysql_close();
+	}
+}
+}
+
+
+//echo json_encode(getFriendCheckins("835336", $accesstoken));
+//574924679?fields=id,name,friends,email,gender,education,address,location,locale,work,birthday,hometown
+function getFriendCheckins($fbid,$accesstoken,$what="checkins")
+{
+	if($what ==="checkins")
+		$url = "https://graph.facebook.com/".$fbid."/".$what."/?fields=created_time,id,message,place,likes&access_token=".$accesstoken."&limit=200";
+	else
+   		$url = 
+"https://graph.facebook.com/".$fbid."/".$what."/?fields=created_time,id,name,place,likes&access_token=".$accesstoken."&limit=200";
+	//?fields=photos.fields(place,id,created_time,likes,tags)
+	echo $url;
+	return getFCheck($url);
+}
+
+function getFCheck($url){
+	$checkinlist =  json_decode(getHttp($url));//print_r($checkinlist);exit;
+	if(isset($checkinlist->paging->next))
+	{
+		//$checkinlist->data->append(json_decode(getFCheck($checkinlist->next))->data);
+		$se = (getFCheck($checkinlist->paging->next));
+		if(isset($se->data))
+		$checkinlist->data=(object)array_merge($checkinlist->data,(array)$se->data);
+	}
+	return $checkinlist;
+}
+
+function getHttp($url){
+        $ch = curl_init();
+
+	//$headers[]= "Cookie: ";
+	//curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    	curl_setopt($ch, CURLOPT_HEADER,0);
+
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_URL, $url);
+
+        $output=curl_exec($ch);
+        curl_close($ch);
+
+        return $output;
+}
+
+
+function readaFile($filename)
+{
+	$fh = fopen($filename, 'r') or die("can't open file");
+	$data = fread($fh,filesize($filename));
+	$listobj = json_decode($data);
+	return 	$listobj;
+}
+
+function writeobj2file($obj, $filename)
+{
+	$fh = fopen($filename, 'w') or die("can't open file");
+	$stringData = json_encode($obj);
+	fwrite($fh, $stringData);
+	fclose($fh);	
+}
+
+function writestr2file($str, $filename)
+{
+	$fh = fopen($filename, 'w') or die("can't open file");
+	fwrite($fh, $str);
+	fclose($fh);	
+}
+
+function quertmysql($query)
+{
+	$username="root";
+	$password="what2do";
+	$database="what2do";
+	mysql_connect("localhost",$username,$password);
+	@mysql_select_db($database) or die( "Unable to select database");
+	mysql_query("SET NAMES utf8");
+	mysql_query($query);
+	mysql_close();
+}
+
+
+?> 

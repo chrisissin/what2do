@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>what2do</title>
+    <script src="//maps.google.com/maps?file=api&amp;v=2.x&amp;key=AIzaSyCZQ40nYljLfyj7oTQbOcqKQyMsyH7jNIw" type="text/javascript"></script>
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script> 
+    <style>
+    body {margin: 0; padding: 0;}
+    a:link {text-decoration: none;}
+    ul.dispp {
+        list-style-type: none;
+        padding: 0;
+    }
+    li.item:first-child {
+        border-top: 1px solid #dddddd;
+    }
+    li.item {
+        padding-bottom: 10px;
+        border-bottom: 1px solid #dddddd;
+    }
+    .place {
+        display: block;
+        padding: 5px;
+        background: lightgray;
+    }
+    .friend {
+        font-size: 0.8em;
+        border: 1px solid lightgray;
+        border-radius: 5px;
+        padding: 3px;
+        margin: 2px;
+        display: inline-block;
+    }
+    .category {font-size:0.8em; color:gray;}
+    </style>
+  </head>
+<script>
+      // Load the SDK Asynchronously
+      (function(d){
+         var js, id = 'facebook-jssdk', ref = d.getElementsByTagName('script')[0];
+         if (d.getElementById(id)) {return;}
+         js = d.createElement('script'); js.id = id; js.async = true;
+         js.src = "//connect.facebook.net/en_US/all.js";
+         ref.parentNode.insertBefore(js, ref);
+       }(document));
+
+      // Init the SDK upon load
+      window.fbAsyncInit = function() {
+        FB.init({
+          appId      : '494714713872866', // App ID
+          channelUrl : '//'+window.location.hostname+'/channel.html', // Path to your Channel File
+          status     : true, // check login status
+          cookie     : true, // enable cookies to allow the server to access the session
+          xfbml      : true  // parse XFBML
+        });
+/*
+        // listen for and handle auth.statusChange events
+        FB.Event.subscribe('auth.statusChange', function(response) {
+          if (response.authResponse) {
+            // user has auth'd your app and is logged into Facebook
+            FB.api('/me', function(me){
+              if (me.name) {
+                document.getElementById('auth-displayname').innerHTML = me.name;
+              }
+            })
+            document.getElementById('auth-loggedout').style.display = 'none';
+            document.getElementById('auth-loggedin').style.display = 'block';
+          } else {
+            // user has not auth'd your app, or is not logged into Facebook
+            document.getElementById('auth-loggedout').style.display = 'block';
+            document.getElementById('auth-loggedin').style.display = 'none';
+          }
+        });
+*/
+        // respond to clicks on the login and logout links
+        document.getElementById('auth-loginlink').addEventListener('click', function(){
+          FB.login();
+        });
+        document.getElementById('auth-logoutlink').addEventListener('click', function(){
+          FB.logout();
+        }); 
+      } 
+  function getyourdata()
+  {
+        var act = FB.getAccessToken(),
+            fbid = FB.getUserID(),
+            urrl = "what2do.php?accesstoken="+act+"&fbid="+fbid;
+        $.ajax(urrl);
+  }
+
+  function givemydata(sw)
+  {
+    var d = new Date(),
+        mtt = new Date().getHours(),
+            fbid = FB.getUserID(),
+            urrl = "getmedata.php?fbid="+fbid+"&lon="+lng+"&lat="+lat+"&sw="+sw+"&tm="+mtt,
+            preItem = {placeid: '', id: '', friend_name: ''};
+
+    $('div.info').text(urrl);
+        $('ul.dispp').empty();
+        $('ul.dispp').css({backgroundImage: 'url(http://jimpunk.net/Loading/wp-content/uploads/loading3.gif)',
+                           backgroundPosition: 'center',
+                           backgroundRepeat: 'no-repeat',
+                           height: '50px'});
+    $.getJSON(urrl, function (data){
+            $('ul.dispp').css({backgroundimage: '',
+                               height: ''});
+            if (data.length === 0)
+            {
+                $('<li>no data</li>').appendTo('ul.dispp');
+                return;
+            }
+
+            console.log(data);
+            var markup = '';
+            $(data).each(function(index, item) {
+                var placeMarkup, friendMarkup;
+                if (item.placeid != preItem.placeid)
+                {
+                    if (index > 0)
+                    {
+                        markup += '</li>';
+                        $(markup).appendTo('ul.dispp');
+                        markup = '';
+                    }
+                    placeMarkup = '<a href="http://www.facebook.com/'+item.placeid+'" target="_blank"><span class="place">'+item.name+'</span></a>',
+                    markup += '<li class="item">'+placeMarkup;
+                    preItem.placeid = item.placeid;
+                    preItem.friend_name = '';
+                }
+                if (item.friend_name && item.friend_name != '')
+                {
+                    if (item.friend_name != preItem.friend_name)
+                    {
+                        if (preItem.friend_name != '')
+                        {
+                            markup += '<br/>';
+                        }
+                        preItem.friend_name = item.friend_name;
+                    }
+                    friendMarkup = '<a href="http://www.facebook.com/'+item.id+'" target="_blank"><span class="friend">'+item.friend_name+'</span></a>';
+                    markup += friendMarkup;
+                }
+                //categoryMarkup = (item.place_category) ? '<br/><span class="category">('+item.place_category+')</span>' : '';
+                //$('<li class="item">'+placeMarkup + friendMarkup + categoryMarkup+'</li>').appendTo('ul.dispp');
+            });
+    });
+  }
+
+  var isMobile = {
+      Android: function() {
+          return navigator.userAgent.match(/Android/i);
+      },
+      BlackBerry: function() {
+          return navigator.userAgent.match(/BlackBerry/i);
+      },
+      iOS: function() {
+          return navigator.userAgent.match(/iPhone|iPad|iPod/i);
+      },
+      Opera: function() {
+          return navigator.userAgent.match(/Opera Mini/i);
+      },
+      Windows: function() {
+          return navigator.userAgent.match(/IEMobile/i);
+      },
+      any: function() {
+          return (isMobile.Android() || isMobile.BlackBerry() || isMobile.iOS() || isMobile.Opera() || isMobile.Windows());
+      }
+  };
+
+  var lat = 0;
+  var lng = 0;
+  function onPositionUpdate(position)
+  {
+     setPosition(position.coords.longitude, position.coords.latitude);
+  }
+  function setPosition(inlng, inlat)
+  {
+    $('div.info').text(inlng);
+    lat = inlat;
+    lng = inlng;
+  }
+  if( !isMobile.any() ) {
+        if(navigator.geolocation)
+            navigator.geolocation.getCurrentPosition(onPositionUpdate);
+        else
+            alert("can't get your location");
+  }
+    var map = null;
+    var geocoder = null;
+
+    function initialize() {
+      if (GBrowserIsCompatible()) {
+        //map = new GMap2(document.getElementById("map_canvas"));
+        //map.setCenter(new GLatLng(37.4419, -122.1419), 13);
+        geocoder = new GClientGeocoder();
+      }
+      if(0!=FB.getUserID()){
+        
+      }
+    }
+
+  function showAddress(address) {
+
+      if (geocoder) {
+        geocoder.getLatLng(
+          address,
+          function(point) {
+            if (!point) {
+              alert(address + " not found");
+            } else {
+              setPosition(point.lng(),point.lat());
+              givemydata(2);
+              /*
+              map.setCenter(point, 13);
+              var marker = new GMarker(point);
+              map.addOverlay(marker);
+
+              // As this is user-generated content, we display it as
+              // text rather than HTML to reduce XSS vulnerabilities.
+              marker.openInfoWindow(document.createTextNode(address));
+              */
+            }
+          }
+        );
+      }
+    }
+
+
+  </script>  
+  <body onload="initialize()" onunload="GUnload()">
+    <div id="fb-root"></div>
+
+
+    <div>
+      <input type="text" size="60" class="address" name="address" value="new york" />
+        <button type="button" onclick="showAddress($('input.address').attr('value')); return false">get da place</button> 
+        <button type="button" onclick="givemydata(11)">11 click me to see what to do around here</button>	
+        <br/>
+        <button type="button" onclick="getyourdata()">give me</button>
+        <br/>	
+        <button type="button" onclick="givemydata(2)">2 around here</button>
+        <button type="button" onclick="givemydata(0)">0 this time of this day and day of week</button>
+        <button type="button" onclick="givemydata(1)">1 around here AND this day of week and time of day</button>
+        <button type="button" onclick="givemydata(3)">3 this day of week</button>
+        <button type="button" onclick="givemydata(4)">4 this time of day</button>
+        <button type="button" onclick="givemydata(5)">5 this season of year</button>
+    </div>
+	<div class="info"></div>
+    <hr/>
+    <ul class="dispp"></ul>
+    alrite, log in to fb and see who is doing what around you	:
+    <div class="fblogin">
+        <fb:login-button perms="read_stream,offline_access,friends_photos,friends_status,friends_checkins"></fb:login-button>
+    </div>
+  </body>
+</html>
+
+
